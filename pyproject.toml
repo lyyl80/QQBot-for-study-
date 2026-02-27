@@ -1,0 +1,18 @@
+[project]
+name = "mars-ai"
+version = "0.1.0"
+description = "MarsAI QQ Bot"
+requires-python = ">=3.9"
+dependencies = [
+    "nonebot2",
+    "nonebot-adapter-onebot",
+    "openai",
+    "ollama",
+]
+
+[tool.nonebot]
+adapters = [
+    { name = "OneBot V11", module_name = "nonebot.adapters.onebot.v11" }
+]
+plugins = []
+plugin_dirs = ["src/plugins"]

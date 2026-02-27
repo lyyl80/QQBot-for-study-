@@ -1,0 +1,4 @@
+openai
+ollama
+nonebot2
+nonebot-adapter-onebot
