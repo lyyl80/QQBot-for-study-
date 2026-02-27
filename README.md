@@ -43,11 +43,6 @@ export DEEPSEEK_API_KEY=your_deepseek_api_key_here
 ```bash
 python bot.py
 ```
-
-## 插件
-
-AI 对话插件位于 `src/plugins/mars_ai/`，使用 `/` 命令触发（具体命令请查看插件代码）。
-
 ## 依赖
 
 - nonebot2
