@@ -7,6 +7,9 @@
 - 支持群聊和私聊 AI 对话
 - 可切换云端模型（DeepSeek）和本地模型（Ollama）
 - 简单的会话管理（内存中）
+- 长期记忆支持（自动总结和存储重要对话）
+- 智能提醒功能（自然语言解析，支持重复提醒）
+- 模型管理和预设角色切换
 - 自动下载 Bilibili 视频（支持私聊和群聊发送）
 
 ## 快速开始
@@ -62,6 +65,8 @@ python bot.py
 | `/clear` | 清除当前会话历史 |
 | `/prompt` | 显示或更新系统 prompt |
 | `/model` | 显示或切换 AI 模型 |
+| `/memory` | 管理长期记忆 |
+| `/reminder` | 设置和管理提醒 |
 | `/summary` | 总结当前对话内容 |
 | `/history` | 查看最近对话历史 |
 | `/status` | 显示系统状态 |
@@ -79,6 +84,7 @@ python bot.py
 - openai (用于云端模型)
 - ollama (用于本地模型)
 - yt-dlp (用于 Bilibili 视频下载)
+- nonebot-plugin-apscheduler (用于提醒调度)
 
 ## 许可证
 
