@@ -9,6 +9,7 @@ dependencies = [
     "openai",
     "ollama",
     "yt-dlp",
+    "nonebot-plugin-apscheduler",
 ]
 
 [tool.nonebot]
