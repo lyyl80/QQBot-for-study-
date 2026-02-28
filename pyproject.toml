@@ -8,6 +8,7 @@ dependencies = [
     "nonebot-adapter-onebot",
     "openai",
     "ollama",
+    "yt-dlp",
 ]
 
 [tool.nonebot]

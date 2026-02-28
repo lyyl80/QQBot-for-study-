@@ -227,6 +227,18 @@ def is_at_me_or_private() -> Rule:
     """检查消息是否@机器人或是私聊"""
     async def _rule(event: Event, state: T_State) -> bool:
         from nonebot.adapters.onebot.v11 import PrivateMessageEvent, GroupMessageEvent
+        import re
+        
+        # 检查消息是否包含B站链接，如果是则让bilibili_downloader处理
+        text = event.get_plaintext().strip()
+        bili_patterns = [
+            r"https?://(?:www\.)?bilibili\.com/video/(BV\w+)[^\s]*",
+            r"https?://b23\.tv/\w+[^\s]*",
+            r"https?://(?:www\.)?bilibili\.com/video/av\d+[^\s]*",
+        ]
+        for pattern in bili_patterns:
+            if re.search(pattern, text):
+                return False  # 不处理B站链接
         
         if isinstance(event, PrivateMessageEvent):
             return True  # 私聊总是回复
