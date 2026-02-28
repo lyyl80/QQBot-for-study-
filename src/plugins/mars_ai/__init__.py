@@ -209,10 +209,52 @@ class ReminderManager:
                 self.reminders = []
         else:
             self.reminders = []
+        
+        # 加载后清理数据，确保历史提醒最多5个
+        self._cleanup_reminders()
+    
+    def _cleanup_reminders(self):
+        """清理提醒数据，限制历史提醒最多5个，待处理提醒无上限"""
+        # 分离待处理提醒和历史提醒
+        pending_reminders = []
+        history_reminders = []
+        
+        for reminder in self.reminders:
+            if reminder.get("status") == "pending":
+                pending_reminders.append(reminder)
+            else:
+                history_reminders.append(reminder)
+        
+        # 历史提醒按时间排序，保留最新的5个
+        # 首先尝试按 sent_time 排序，如果没有则按 created_time 排序
+        def get_history_sort_key(reminder):
+            # 优先使用 sent_time（已发送时间）
+            if "sent_time" in reminder:
+                return reminder["sent_time"]
+            # 其次使用 cancelled_time（取消时间）
+            elif "cancelled_time" in reminder:
+                return reminder["cancelled_time"]
+            # 最后使用 created_time（创建时间）
+            else:
+                return reminder.get("created_time", "1970-01-01T00:00:00")
+        
+        # 按时间倒序排列（最新的在前）
+        history_reminders.sort(key=get_history_sort_key, reverse=True)
+        
+        # 限制历史提醒最多5个
+        if len(history_reminders) > 5:
+            history_reminders = history_reminders[:5]
+        
+        # 合并提醒列表（历史提醒已按时间排序，待处理提醒保持原有顺序）
+        self.reminders = pending_reminders + history_reminders
     
     def save_reminders(self):
-        """保存提醒数据"""
+        """保存提醒数据，限制历史提醒最多5个，待处理提醒无上限"""
         try:
+            # 清理提醒数据（限制历史提醒数量）
+            self._cleanup_reminders()
+            
+            # 保存到文件
             Path("session").mkdir(exist_ok=True)
             with open(self.reminders_file, "w", encoding="utf-8") as f:
                 json.dump(self.reminders, f, ensure_ascii=False, indent=2)
