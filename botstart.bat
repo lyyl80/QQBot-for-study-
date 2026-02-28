@@ -1,0 +1,1 @@
+python "D:\Python\Doc\qqbot\bot.py"
