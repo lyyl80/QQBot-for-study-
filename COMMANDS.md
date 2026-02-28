@@ -276,6 +276,43 @@ Prompt长度：256 字符
 会话历史：42 条消息
 ```
 
+## Bilibili 视频下载功能
+
+机器人自动检测并下载 Bilibili 视频，支持多种链接格式。
+
+### 支持链接格式
+- `https://www.bilibili.com/video/BVxxx`
+- `https://b23.tv/xxx`（短链接）
+- `https://www.bilibili.com/video/avxxx`（旧版AV号）
+- `https://www.bilibili.com/bangumi/play/ssxxx`（番剧）
+- `https://www.bilibili.com/bangumi/play/epxxx`（剧集）
+
+### 使用方法
+1. 在私聊或群聊中发送任意支持的B站链接
+2. 机器人会自动检测并开始下载
+3. 下载完成后发送视频文件到当前聊天窗口
+
+### 注意事项
+- **下载需要时间**：视频下载和转码需要一定时间，请耐心等待
+- **文件大小限制**：QQ对发送的视频文件大小有限制（通常≤100MB）
+- **FFmpeg推荐**：建议安装 FFmpeg 以获得更好的视频兼容性
+- **Cookies（可选）**：如果需要下载高清或会员视频，可以在 `~/.yt-dlp/cookies.txt` 放置 cookies 文件
+- **网络要求**：需要稳定的网络连接访问B站和下载视频
+
+### 常见问题
+#### Q：为什么下载的视频没有声音？
+A：可能因为FFmpeg未安装。请安装FFmpeg并确保其在系统PATH中。
+
+#### Q：下载失败怎么办？
+A：可能原因：
+1. 视频需要B站大会员权限
+2. 网络连接问题
+3. 视频已被删除或屏蔽
+4. FFmpeg相关错误（尝试安装FFmpeg）
+
+#### Q：可以下载多长的视频？
+A：受QQ文件大小限制，建议下载较短的视频（≤10分钟）。
+
 ## 常见问题
 
 ### Q1：为什么更新 prompt 后历史被清除了？
@@ -303,12 +340,14 @@ A：可能的原因：
 ## 文件结构
 - `session/user_sessions.json` - 存储所有会话历史
 - `session/bot_config.json` - 存储系统配置（模型和 prompt）
-- `src/plugins/mars_ai/__init__.py` - 命令实现代码
+- `src/plugins/mars_ai/__init__.py` - AI 命令实现代码
+- `src/plugins/bilibili_downloader/__init__.py` - B站视频下载器插件
 
 ## 更新日志
 - v1.0 - 初始版本，包含基本命令
 - v1.1 - 添加 `/summary`, `/history`, `/status`, `/reset` 命令
 - v1.2 - 改进 `/prompt` 命令，添加预览功能
+- v1.3 - 添加 Bilibili 视频下载功能
 
 ---
 

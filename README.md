@@ -7,6 +7,7 @@
 - 支持群聊和私聊 AI 对话
 - 可切换云端模型（DeepSeek）和本地模型（Ollama）
 - 简单的会话管理（内存中）
+- 自动下载 Bilibili 视频（支持私聊和群聊发送）
 
 ## 快速开始
 
@@ -38,6 +39,13 @@ set DEEPSEEK_API_KEY=your_deepseek_api_key_here
 export DEEPSEEK_API_KEY=your_deepseek_api_key_here
 ```
 
+对于 Bilibili 下载功能（可选）：
+- 如果需要下载高清或会员视频，可以在 `~/.yt-dlp/cookies.txt` 放置 cookies 文件
+- 建议安装 FFmpeg 以获得更好的视频兼容性
+  - Windows：从 [FFmpeg官网](https://ffmpeg.org/download.html) 下载，解压后将 `bin` 目录添加到系统 PATH
+  - Linux：`sudo apt install ffmpeg`（Debian/Ubuntu）或 `sudo yum install ffmpeg`（CentOS/RHEL）
+  - macOS：`brew install ffmpeg`
+
 ### 3. 运行机器人
 
 ```bash
@@ -59,6 +67,9 @@ python bot.py
 | `/status` | 显示系统状态 |
 | `/reset` | 重置对话 |
 
+### B站视频下载功能
+机器人自动检测 Bilibili 视频链接（支持多种链接格式），下载后发送视频文件到聊天窗口。
+
 **详细命令说明**：请查看 [COMMANDS.md](COMMANDS.md) 获取完整文档和示例。
 
 ## 依赖
@@ -67,6 +78,7 @@ python bot.py
 - nonebot-adapter-onebot
 - openai (用于云端模型)
 - ollama (用于本地模型)
+- yt-dlp (用于 Bilibili 视频下载)
 
 ## 许可证
 
