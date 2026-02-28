@@ -43,6 +43,24 @@ export DEEPSEEK_API_KEY=your_deepseek_api_key_here
 ```bash
 python bot.py
 ```
+
+### 4. 使用命令
+
+机器人支持以下命令（私聊直接发送，群聊需要@机器人）：
+
+| 命令 | 功能描述 |
+|------|----------|
+| `/help` | 显示所有可用命令 |
+| `/clear` | 清除当前会话历史 |
+| `/prompt` | 显示或更新系统 prompt |
+| `/model` | 显示或切换 AI 模型 |
+| `/summary` | 总结当前对话内容 |
+| `/history` | 查看最近对话历史 |
+| `/status` | 显示系统状态 |
+| `/reset` | 重置对话 |
+
+**详细命令说明**：请查看 [COMMANDS.md](COMMANDS.md) 获取完整文档和示例。
+
 ## 依赖
 
 - nonebot2
