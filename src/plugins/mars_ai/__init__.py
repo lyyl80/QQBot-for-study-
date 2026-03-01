@@ -1057,7 +1057,11 @@ Prompt长度：{prompt_len} 字符
 /reminder clear - 清除所有待处理提醒
 /reminder help - 显示此帮助
 
-设置提醒时，如果希望提醒按原文发送，可在消息中包含关键词，例如“原封不动”、“原文”等，机器人会在触发时直接发送内容，而不调用AI生成友好语句。"""
+设置提醒时，如果希望提醒按原文发送，可在消息中包含关键词，例如“原封不动”、“原文”等，机器人会在触发时直接发送内容，而不调用AI生成友好语句。
+
+在私聊中设置发送到群的提醒：机器人会尝试使用用户最近在群聊中@它的群作为目标，如有多个请先在相应群里@我一次，或者直接在命令中指定群ID。
+
+系统还会根据文本中的关键词自动判断渠道，例如包含“在群里”、“群聊”等词语时会选择群渠道，包含“私聊”、“私下”等词语时会选择私聊。"""
             await mars_ai.send(help_text)
             return
         
@@ -1266,6 +1270,16 @@ async def handle_message(event: MessageEvent, msg: str = EventPlainText()):
                 repeat_rule = parsed.get("repeat", "none")
                 channel = parsed.get("channel", "current")
 
+                # 根据消息文本关键词进一步调整渠道，防止解析出错
+                import re
+                lower_text = msg_stripped.lower()
+                # 如果用户明确写了“群里”或“在群”则走群渠道
+                if re.search(r"在群|群里|群聊", lower_text):
+                    channel = "group"
+                # 如果明确要求私聊
+                elif re.search(r"私聊|私下|发我", lower_text):
+                    channel = "private"
+
                 # 判断是否要求原文发送（用户可能在原始命令中包含关键字）
                 use_ai = True
                 raw_indicators = ["原封不动", "原文", "按原文", "原样"]
@@ -1289,7 +1303,23 @@ async def handle_message(event: MessageEvent, msg: str = EventPlainText()):
                         await mars_ai.send("未能获取目标群聊，请先在群里@我或指定群ID，然后再设置群提醒。")
                         return
 
-                
+                # 添加提醒到管理器
+                reminder_id = reminder_manager.add_reminder(
+                    user_id=user_id,
+                    group_id=group_id,
+                    remind_time=remind_time,
+                    content=content,
+                    channel=channel,
+                    repeat_rule=repeat_rule,
+                    use_ai=use_ai
+                )
+
+                # 准备确认消息所需的描述文字
+                channel_map = {"current": "原聊天渠道", "private": "私聊", "group": "群聊"}
+                channel_text = channel_map.get(channel, "原聊天渠道")
+                repeat_map = {"none": "单次", "daily": "每天", "weekly": "每周", "monthly": "每月"}
+                repeat_text = repeat_map.get(repeat_rule, "单次")
+
                 confirm_msg = f"✅ 已设置提醒：\n"
                 confirm_msg += f"时间：{time_str}\n"
                 confirm_msg += f"内容：{content}\n"
