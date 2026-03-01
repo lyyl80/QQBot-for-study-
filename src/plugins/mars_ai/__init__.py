@@ -230,6 +230,10 @@ class ReminderManager:
                     if isinstance(loaded, list):
                         # 过滤掉非字典元素
                         self.reminders = [item for item in loaded if isinstance(item, dict)]
+                        # 兼容旧版数据：缺少 use_ai 字段的提醒默认使用 AI
+                        for r in self.reminders:
+                            if "use_ai" not in r:
+                                r["use_ai"] = True
                         print(f"加载了 {len(self.reminders)} 个提醒")
                     else:
                         print(f"警告：提醒数据格式不正确，应为列表，实际为 {type(loaded)}")
@@ -400,12 +404,16 @@ class ReminderManager:
             user_id = reminder["user_id"]
             channel = reminder.get("channel", "current")  # current, private, group
             
-            # 尝试使用AI生成更自然的提醒消息
-            ai_message = None
-            try:
-                from datetime import datetime
-                current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
-                prompt = f"""用户之前设置了提醒：'{content}'。请生成一个友好、自然的提醒语句，提醒用户这件事。可以适当加入表情符号让语气更亲切。
+            # 根据设置决定是否使用AI
+            use_ai = reminder.get("use_ai", True)
+            message = content  # 默认直接使用原始内容
+            if use_ai:
+                # 尝试使用AI生成更自然的提醒消息
+                ai_message = None
+                try:
+                    from datetime import datetime
+                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    prompt = f"""用户之前设置了提醒：'{content}'。请生成一个友好、自然的提醒语句，提醒用户这件事。可以适当加入表情符号让语气更亲切。
 
 示例：
 - 如果内容是"喝水"，可以说："💧 喝水时间到啦！记得补充水分哦～"
@@ -413,21 +421,28 @@ class ReminderManager:
 - 如果内容是"现在是几点了"，可以说："⏰ 你让我提醒你查看时间，现在大概是{current_time}左右哦～"
 
 请生成提醒语句："""
+                    
+                    ai_response = model_manager.call_model(
+                        [{"role": "user", "content": prompt}],
+                        "你是一个贴心的提醒助手，擅长生成友好、亲切的提醒消息。"
+                    )
+                    
+                    if ai_response and not ai_response.startswith("云端模型调用失败") and not ai_response.startswith("本地模型调用失败"):
+                        ai_message = ai_response.strip()
+                        print(f"[DEBUG] AI生成的提醒消息: {ai_message}")
+                    else:
+                        print(f"[DEBUG] AI生成失败，使用原始消息: {ai_response}")
+                except Exception as e:
+                    print(f"[DEBUG] AI生成提醒消息时出错: {e}")
                 
-                ai_response = model_manager.call_model(
-                    [{"role": "user", "content": prompt}],
-                    "你是一个贴心的提醒助手，擅长生成友好、亲切的提醒消息。"
-                )
-                
-                if ai_response and not ai_response.startswith("云端模型调用失败") and not ai_response.startswith("本地模型调用失败"):
-                    ai_message = ai_response.strip()
-                    print(f"[DEBUG] AI生成的提醒消息: {ai_message}")
+                if ai_message:
+                    message = ai_message
                 else:
-                    print(f"[DEBUG] AI生成失败，使用原始消息: {ai_response}")
-            except Exception as e:
-                print(f"[DEBUG] AI生成提醒消息时出错: {e}")
+                    message = f"提醒：{content}"
+            else:
+                # 不使用AI，直接发送原内容
+                print(f"[DEBUG] 使用原文模式发送内容")
             
-            message = ai_message if ai_message else f"提醒：{content}"
             print(f"[DEBUG] 最终消息内容: {message}, 用户ID: {user_id}, 渠道: {channel}")
             
             if channel == "private":
@@ -557,8 +572,12 @@ class ReminderManager:
         else:
             return timedelta(days=1)
     
-    def add_reminder(self, user_id, group_id, remind_time, content, channel="current", repeat_rule="none"):
-        """添加新提醒"""
+    def add_reminder(self, user_id, group_id, remind_time, content, channel="current", repeat_rule="none", use_ai=True):
+        """添加新提醒
+
+        :param use_ai: 是否使用AI生成友好提醒语句。
+                       如果为False，bot将在触发时直接发送 `content` 原文。
+        """
         reminder_id = f"{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
         reminder = {
@@ -569,6 +588,7 @@ class ReminderManager:
             "content": content,
             "channel": channel,
             "repeat_rule": repeat_rule,
+            "use_ai": use_ai,
             "status": "pending",
             "created_time": datetime.now().isoformat()
         }
@@ -754,6 +774,8 @@ async def test_scheduler():
 
 private_sessions = {}
 group_sessions = {}
+# 记录用户最近一次在群聊中使用机器人的群ID，用于私聊设置群提醒
+last_group_by_user = {}
 session_file = Path("session/user_sessions.json")
 session_cache = {"private": {}, "group": {}}
 
@@ -1033,7 +1055,9 @@ Prompt长度：{prompt_len} 字符
 /reminder list - 列出所有提醒
 /reminder cancel <id> - 取消指定提醒
 /reminder clear - 清除所有待处理提醒
-/reminder help - 显示此帮助"""
+/reminder help - 显示此帮助
+
+设置提醒时，如果希望提醒按原文发送，可在消息中包含关键词，例如“原封不动”、“原文”等，机器人会在触发时直接发送内容，而不调用AI生成友好语句。"""
             await mars_ai.send(help_text)
             return
         
@@ -1066,7 +1090,8 @@ Prompt长度：{prompt_len} 字符
                     repeat = repeat_map.get(rem.get("repeat_rule", "none"), "单次")
                     status_map = {"pending": "待处理", "sent": "已发送", "expired": "已过期", "cancelled": "已取消", "failed": "失败"}
                     status = status_map.get(rem.get("status", "pending"), rem.get("status", "未知"))
-                    reminder_text += f"\n{i}. ID: {rem['id']}\n   时间: {time_str}\n   内容: {rem['content']}\n   重复: {repeat}\n   渠道: {channel}\n   状态: {status}\n"
+                    mode = "AI" if rem.get("use_ai", True) else "原文"
+                    reminder_text += f"\n{i}. ID: {rem['id']}\n   时间: {time_str}\n   内容: {rem['content']}\n   模式: {mode}\n   重复: {repeat}\n   渠道: {channel}\n   状态: {status}\n"
             
             # 显示其他状态的提醒
             if other_reminders:
@@ -1075,7 +1100,8 @@ Prompt长度：{prompt_len} 字符
                     time_str = datetime.fromisoformat(rem["remind_time"]).strftime("%Y-%m-%d %H:%M")
                     status_map = {"pending": "待处理", "sent": "已发送", "expired": "已过期", "cancelled": "已取消", "failed": "失败"}
                     status = status_map.get(rem.get("status", "unknown"), rem.get("status", "未知"))
-                    reminder_text += f"\n{i}. ID: {rem['id']}\n   时间: {time_str}\n   内容: {rem['content']}\n   状态: {status}\n"
+                    mode = "AI" if rem.get("use_ai", True) else "原文"
+                    reminder_text += f"\n{i}. ID: {rem['id']}\n   时间: {time_str}\n   内容: {rem['content']}\n   模式: {mode}\n   状态: {status}\n"
             
             await mars_ai.send(reminder_text)
         
@@ -1182,6 +1208,8 @@ async def handle_message(event: MessageEvent, msg: str = EventPlainText()):
         session_key = str(event.group_id)
         session_type = "group"
         group_id = event.group_id
+        # 更新用户最后活跃群
+        last_group_by_user[user_id] = event.group_id
     else:
         return
     
@@ -1237,27 +1265,36 @@ async def handle_message(event: MessageEvent, msg: str = EventPlainText()):
                 content = parsed.get("content", "提醒")
                 repeat_rule = parsed.get("repeat", "none")
                 channel = parsed.get("channel", "current")
+
+                # 判断是否要求原文发送（用户可能在原始命令中包含关键字）
+                use_ai = True
+                raw_indicators = ["原封不动", "原文", "按原文", "原样"]
+                # 检测原始消息文本而不是解析后的content，因为AI输出可能移除关键词
+                for keyword in raw_indicators:
+                    if keyword in msg_stripped:
+                        use_ai = False
+                        break
+                # 对于原文模式，尝试清理content中的关键字和常见分隔符
+                if not use_ai:
+                    import re
+                    content = re.sub(r"(?:原封不动|原文|按原文|原样)[:：]?\s*", "", content)
                 
-                # 添加提醒
-                reminder_id = reminder_manager.add_reminder(
-                    user_id=user_id,
-                    group_id=group_id,
-                    remind_time=remind_time,
-                    content=content,
-                    channel=channel,
-                    repeat_rule=repeat_rule
-                )
-                
-                # 发送确认消息
-                time_str = remind_time.strftime("%Y-%m-%d %H:%M")
-                channel_map = {"current": "原聊天渠道", "private": "私聊", "group": "群聊"}
-                repeat_map = {"none": "单次", "daily": "每天", "weekly": "每周", "monthly": "每月"}
-                channel_text = channel_map.get(channel, "原聊天渠道")
-                repeat_text = repeat_map.get(repeat_rule, "单次")
+                # 如果用户在私聊中指定了群提醒且未提供group_id，则尝试使用最后活跃的群
+                if channel == "group" and not group_id:
+                    fallback = last_group_by_user.get(user_id)
+                    if fallback:
+                        group_id = fallback
+                    else:
+                        # 无法推断群ID，提示并返回
+                        await mars_ai.send("未能获取目标群聊，请先在群里@我或指定群ID，然后再设置群提醒。")
+                        return
+
                 
                 confirm_msg = f"✅ 已设置提醒：\n"
                 confirm_msg += f"时间：{time_str}\n"
                 confirm_msg += f"内容：{content}\n"
+                mode_text = "AI生成" if use_ai else "原文发送"
+                confirm_msg += f"模式：{mode_text}\n"
                 confirm_msg += f"重复：{repeat_text}\n"
                 confirm_msg += f"渠道：{channel_text}\n"
                 confirm_msg += f"提醒ID：{reminder_id}\n"
