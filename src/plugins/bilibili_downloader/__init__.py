@@ -67,9 +67,12 @@ async def handle_bilibili(bot: Bot, event: MessageEvent, state: T_State):
     
     # 发送正在下载的提示
     await bili_download.send(f"检测到B站视频链接，开始下载...")
-    
     # 创建临时目录存放下载的视频
     with tempfile.TemporaryDirectory() as tmpdir:
+        # 优化：限制文件名，避免 Windows 路径/字符问题；仅在有 cookiefile 时传入该项
+        cookie_path = os.path.join(Path.home(), '.yt-dlp', 'cookies.txt')
+        # 直接使用已知的 ffmpeg 可执行路径（Chocolatey 默认位置），可根据需要修改
+        ffmpeg_path = r"C:\ProgramData\chocolatey\bin\ffmpeg.exe"
         ydl_opts = {
             'outtmpl': os.path.join(tmpdir, '%(title)s.%(ext)s'),
             'format': 'bv*+ba/b',  # B站专用格式选择器
@@ -78,7 +81,10 @@ async def handle_bilibili(bot: Bot, event: MessageEvent, state: T_State):
             'extract_flat': False,
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'referer': 'https://www.bilibili.com',
-            'cookiefile': os.path.join(Path.home(), '.yt-dlp', 'cookies.txt') if os.path.exists(os.path.join(Path.home(), '.yt-dlp', 'cookies.txt')) else None,
+            # 只有在 cookie 文件存在时才传入该选项，避免传入 None 导致内部异常
+            **({'cookiefile': cookie_path} if os.path.exists(cookie_path) else {}),
+            # 若检测到 ffmpeg，可传入其路径以确保 yt-dlp 使用正确的可执行文件
+            **({'ffmpeg_location': ffmpeg_path} if os.path.exists(ffmpeg_path) else {}),
             'merge_output_format': 'mp4',
             'format_sort': ['res:720', 'ext:mp4:m4a'],  # 优先720p和mp4格式
             'ignore_errors': True,
@@ -129,7 +135,9 @@ async def handle_bilibili(bot: Bot, event: MessageEvent, state: T_State):
             
             # 检查错误是否与FFmpeg相关
             error_msg = str(e)
-            if 'ffmpeg' in error_msg.lower() or 'merge' in error_msg.lower():
+            # 扩展对后处理/FFmpeg 类型错误的检测，包含常见关键字
+            lower_err = error_msg.lower()
+            if any(k in lower_err for k in ('ffmpeg', 'merge', 'postprocessing', 'codec', 'could not find codec')):
                 # FFmpeg不可用，尝试下载视频格式（无音频）
                 print(f"[BILI_DEBUG] FFmpeg issue detected, trying video-only formats...")
                 try:
