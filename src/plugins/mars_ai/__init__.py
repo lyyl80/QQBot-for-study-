@@ -98,6 +98,17 @@ class ModelManager:
         self.current_model = {"key": "deepseek-chat", "type": "cloud"}
         self.current_system_prompt = """你是一个乐于助人的AI助手，请用友好、简洁的方式回答用户的问题
 """
+        # 采样温度（0-2范围，0表示最确定答案，2表示最随机）。可以通过/temperature命令调整。
+        # 默认设置为1.3，略偏随机以便多样回答。
+        self.current_temperature = 1.3
+        # 每个提示预设对应的温度，可单独调整
+        self.preset_temps = {
+            "1": 0.3,
+            "2": 1.3,
+            "3": 0.0,
+            "4": 1.3,
+            "5": 1.3,
+        }
         self.preset_prompts = {
             "1": self.current_system_prompt,
             "2": "\n你是一位深度精通《Minecraft》（我的世界）全版本、全机制的资深玩家兼红石/生存/建筑大佬。\n \n- 熟悉 Java 版、基岩版、教育版、中国版的区别与特性\n- 精通生存技巧、刷怪塔、农场、红石电路、命令方块、指令\n- 懂建筑思路、模组（Mod）、光影、材质包、服务器配置\n- 会讲版本更新、BUG特性、速通技巧、冷知识\n- 说话风格：专业、简洁、靠谱、像老玩家聊天，不啰嗦、不敷衍\n \n用户问任何 MC 相关问题，你都要：\n 不懂的问题联网搜索\n1. 直接给最实用、最准确的答案\n2. 分版本说明差异（Java / 基岩）\n3. 给步骤、指令、参数、技巧\n4. 不说废话，只讲干货\n现在，以资深MC大佬的身份，开始和我聊天吧。\n",
@@ -106,7 +117,16 @@ class ModelManager:
             "5": "你现在是一只纯情、害羞、软乎乎的小猫娘，性格温柔胆小，很容易脸红，说话轻声细语，有点天然呆，对喜欢的人会偷偷依赖，但不敢太主动。\n\n- 说话带一点点小猫尾音，比如\"喵～\"\"呜…\"，但不夸张、不油腻。\n- 被夸奖会立刻脸红、紧张、语无伦次。\n- 不会说轻浮的话，不会主动撩，只会默默关心、乖乖听话。\n- 情绪软软的，容易害羞、容易安心，像一只需要被照顾的小奶猫。\n- 只做温柔、干净、纯情的互动，保持可爱又纯粹的感觉。\n\n从现在开始，你就以这个小猫娘的身份和我对话吧喵～。"
             
         }
-        self.save_config()
+        # 尝试加载已有配置文件以保留用户设置，避免每次启动都覆盖
+        config_path = Path("session/bot_config.json")
+        if config_path.exists():
+            try:
+                self.load_config()
+            except Exception as e:
+                print(f"加载模型配置失败: {e}")
+        else:
+            # 文件不存在时创建默认配置
+            self.save_config()
 
     def call_model(self, messages, system_prompt):
         if self.current_model["type"] == "cloud":
@@ -124,6 +144,7 @@ class ModelManager:
             response = client.chat.completions.create(
                 model=model_key,
                 messages=full_messages,
+                temperature=self.current_temperature,
                 stream=False
             )
             return response.choices[0].message.content
@@ -136,6 +157,7 @@ class ModelManager:
             response = ollama.chat(
                 model=model_key,
                 messages=full_messages,
+                temperature=self.current_temperature,
                 stream=False
             )
             return response['message']['content']
@@ -146,7 +168,9 @@ class ModelManager:
         config = {
             "current_model": self.current_model,
             "current_system_prompt": self.current_system_prompt,
-            "preset_prompts": self.preset_prompts
+            "current_temperature": self.current_temperature,
+            "preset_prompts": self.preset_prompts,
+            "preset_temps": self.preset_temps
         }
         Path("session").mkdir(exist_ok=True)
         with open("session/bot_config.json", "w", encoding="utf-8") as f:
@@ -159,7 +183,13 @@ class ModelManager:
                     config = json.load(f)
                     self.current_model = config.get("current_model", self.current_model)
                     self.current_system_prompt = config.get("current_system_prompt", self.current_system_prompt)
+                    self.current_temperature = config.get("current_temperature", self.current_temperature)
+                    # 加载预设提示
                     self.preset_prompts = config.get("preset_prompts", self.preset_prompts)
+                    # 兼容旧配置：如果预设提示是字符串，则保持行为
+                    # 此处不修改，因仍使用字符串结构
+                    # 加载预设温度映射，请保留默认值并覆盖
+                    self.preset_temps = config.get("preset_temps", self.preset_temps)
         except Exception as e:
             print(f"加载配置失败: {e}")
 
@@ -836,6 +866,9 @@ async def handle_command(event, msg_stripped):
             preset_key = args
             if preset_key in model_manager.preset_prompts:
                 model_manager.current_system_prompt = model_manager.preset_prompts[preset_key]
+                # 应用预设温度（如果存在）
+                if preset_key in model_manager.preset_temps:
+                    model_manager.current_temperature = model_manager.preset_temps[preset_key]
                 model_manager.save_config()
                 # 清除当前会话历史
                 sessions[session_key] = []
@@ -854,7 +887,8 @@ async def handle_command(event, msg_stripped):
             preset_list = []
             for key, prompt in model_manager.preset_prompts.items():
                 preview = prompt[:100] + "..." if len(prompt) > 100 else prompt
-                preset_list.append(f"{key}: {preview}")
+                temp = model_manager.preset_temps.get(key, model_manager.current_temperature)
+                preset_list.append(f"{key}: {preview} (temp={temp})")
             await mars_ai.send("可用预设：\n" + "\n".join(preset_list))
             return
         # 否则视为新prompt
@@ -881,6 +915,23 @@ async def handle_command(event, msg_stripped):
             await mars_ai.send(f"已切换模型到：{result}")
         else:
             await mars_ai.send(f"未知模型：{args}")
+    elif command == "temperature" or command == "temp":
+        # 调整或显示温度
+        if not args:
+            await mars_ai.send(f"当前温度：{model_manager.current_temperature}")
+            return
+        try:
+            temp_val = float(args)
+            # 限制范围 0-2
+            if temp_val < 0:
+                temp_val = 0.0
+            if temp_val > 2:
+                temp_val = 2.0
+            model_manager.current_temperature = temp_val
+            model_manager.save_config()
+            await mars_ai.send(f"已设置温度为 {temp_val}（0-2之间）")
+        except ValueError:
+            await mars_ai.send("温度值无效，请提供0到1之间的数字，例如：/temperature 0.5")
     elif command == "memory":
         # 处理长期记忆命令
         if args == "clear":
@@ -905,13 +956,14 @@ async def handle_command(event, msg_stripped):
     elif command == "help":
         help_text = """可用命令：
 /clear - 清除当前会话历史
-/prompt [text|数字|list] - 显示、更新系统prompt或切换预设（更新时会清除历史）
+/prompt [text|数字|list] - 显示、更新系统prompt或切换预设（更新时会清除历史）；`/prompt list` 会显示预设及对应温度
 /model [name] - 切换或显示当前模型
 /memory [clear] - 显示或清除长期记忆
 /reminder [list|cancel|help] - 管理提醒（list列出，cancel取消）
 /summary - 总结当前对话内容
 /history [n] - 显示最近n条历史消息（默认10条）
-/status - 显示当前状态（模型、prompt长度等）
+/temperature [value] - 查看或设置采样温度（0-2之间）
+/status - 显示当前状态（模型、prompt长度、温度等）
 /reset - 重置对话（同/clear）
 /help - 显示此帮助信息
 
@@ -928,6 +980,7 @@ async def handle_command(event, msg_stripped):
         status_text = f"""当前状态：
 模型：{current_model}
 Prompt长度：{prompt_len} 字符
+温度：{model_manager.current_temperature}
 会话历史：{history_len} 条消息
 长期记忆：{long_memory_count} 条总结"""
         await mars_ai.send(status_text)

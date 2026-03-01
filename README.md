@@ -63,7 +63,7 @@ python bot.py
 |------|----------|
 | `/help` | 显示所有可用命令 |
 | `/clear` | 清除当前会话历史 |
-| `/prompt` | 显示或更新系统 prompt |
+| `/prompt` | 显示或更新系统 prompt（`/prompt list` 会同时显示预设温度） |
 | `/model` | 显示或切换 AI 模型 |
 | `/memory` | 管理长期记忆 |
 | `/reminder` | 设置和管理提醒 |
@@ -71,6 +71,7 @@ python bot.py
 | `/history` | 查看最近对话历史 |
 | `/status` | 显示系统状态 |
 | `/reset` | 重置对话 |
+| `/temperature` | 查看或设置采样温度（0-2范围，值越高越随机） |
 
 ### B站视频下载功能
 机器人自动检测 Bilibili 视频链接（支持多种链接格式），下载后发送视频文件到聊天窗口。

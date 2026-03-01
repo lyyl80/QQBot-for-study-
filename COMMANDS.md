@@ -16,30 +16,34 @@
 | `/summary` | 总结当前对话内容 | 无 | 所有用户 |
 | `/history` | 查看最近对话历史 | `[n]` | 所有用户 |
 | `/status` | 显示当前系统状态 | 无 | 所有用户 |
+| `/temperature` | 查看或设置采样温度，决定回答随机程度 | `[value]` | 所有用户 |
 
 ## 命令详解
 
 ### `/help`
 显示所有可用命令及其简要说明。
 
+[新增] `/temperature` 命令可以在对话中实时调整 AI 生成回答时使用的温度值，范围 0 到 1，值越低输出越确定，值越高输出越随机。
+
+# `/temperature`
+用于查看或设置当前采样温度。
+
 **语法：**
 ```
-/help
+/temperature           # 显示当前温度值
+/temperature <0-2数字>  # 设置新的温度
 ```
 
 **示例：**
 ```
-用户：/help
-AI：可用命令：
-/clear - 清除当前会话历史
-/prompt [text] - 显示或更新系统prompt（更新时会清除历史）
-/model [name] - 切换或显示当前模型
-/summary - 总结当前对话内容
-/history [n] - 显示最近n条历史消息（默认10条）
-/status - 显示当前状态（模型、prompt长度等）
-/reset - 重置对话（同/clear）
-/help - 显示此帮助信息
+用户：/temperature
+AI：当前温度：0.7
+
+用户：/temperature 0.3
+AI：已设置温度为 0.3（0-2之间）
 ```
+
+---
 
 ---
 
@@ -83,9 +87,11 @@ AI：对话已重置
 ### `/prompt`
 显示当前系统 prompt、更新为新的 prompt 或切换预设 prompt。**重要：更新 prompt 时会自动清除当前会话历史**，以避免旧对话干扰新的角色设定。
 
+每个预设同时带有默认的采样温度，使用 `/prompt list` 时一并显示，可通过 `/temperature` 命令手动调整。
+
 **语法：**
 ```
-/prompt                    # 显示当前 prompt 预览
+/prompt                    # 显示当前 prompt 预览（/prompt list 还会显示预设温度）
 /prompt <new_prompt_text>  # 更新 prompt 并清除历史
 /prompt <数字>             # 切换到对应数字的预设 prompt
 /prompt list               # 列出所有可用预设
@@ -110,9 +116,9 @@ AI：已切换到预设 1，当前会话历史已清除
 # 列出预设
 用户：/prompt list
 AI：可用预设：
-1: 你是一位深度精通《Minecraft》（我的世界）全版本...
-2: 你是一个乐于助人的AI助手，请用友好、简洁的方式...
-3: 你是一个编程专家，擅长Python、JavaScript、Java...
+1: 你是一位深度精通《Minecraft》（我的世界）全版本... (temp=1.3)
+2: 你是一个乐于助人的AI助手，请用友好、简洁的方式... (temp=1.0)
+3: 你是一个编程专家，擅长Python、JavaScript、Java... (temp=0.7)
 ```
 
 **注意：**

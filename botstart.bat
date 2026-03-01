@@ -1,1 +1,1 @@
-python "D:\Python\Doc\qqbot\bot.py"
+python ""D:\Python\Doc\qqbot\bot.py""
