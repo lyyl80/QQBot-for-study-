@@ -48,38 +48,72 @@
 
 ## 登录凭证和Cookies配置
 
-对于需要登录的平台（如抖音、小红书等），您需要配置相应的cookies文件以实现下载：
+对于需要登录的平台（如抖音、小红书等），以及需要会员权限才能下载的视频（如B站大会员视频），您需要配置相应的cookies文件以实现下载。
 
-### 1. 获取Cookies文件
+### 如何获取Cookies文件
 
-#### 方法一：使用浏览器扩展
-1. 安装浏览器扩展如 "Cookies.txt" (Chrome) 或 "Export Cookies" (Firefox)
-2. 登录相应平台账号
-3. 使用扩展导出cookies为 Netscape 格式的 cookies.txt 文件
+#### 方法一：使用浏览器扩展（推荐）
+
+**Chrome浏览器：**
+
+1. 访问Chrome网上应用店，搜索并安装 "Get cookies.txt LOCALLY" 扩展
+2. 登录您需要下载视频的平台账号（例如：B站、抖音、小红书等）
+3. 在扩展图标上点击右键，选择"选项"，将"SameSite values"设置为"Discard"
+4. 访问您想要下载的视频页面
+5. 点击浏览器工具栏上的扩展图标，点击"Save cookies.txt"按钮
+6. 将下载的 cookies.txt 文件重命名为 cookies.txt
+
+**Firefox浏览器：**
+
+1. 访问Firefox附加组件网站，搜索并安装 "Export Cookies" 扩展
+2. 登录您需要下载视频的平台账号
+3. 访问您想要下载的视频页面
+4. 点击扩展图标，选择"Export"，保存为 Netscape 格式
 
 #### 方法二：手动获取
+
 1. 登录相应平台账号
-2. 打开开发者工具 (F12)
+2. 打开浏览器开发者工具 (F12)
 3. 访问一个视频页面
-4. 在 Network 标签页中找到请求
-5. 复制请求头中的 Cookie 字段
+4. 在 Network (网络) 标签页中找到请求
+5. 右键点击第一个请求，选择"Copy" → "Copy value"或"Copy as cURL"
+6. 从中提取 Cookie 字段的值
 
-### 2. 配置Cookies文件
+### 如何放置Cookies文件
 
-将获取到的 cookies.txt 文件放置到以下位置之一：
+将获取到的 cookies.txt 文件放置到以下位置：
 
-- Windows: `%USERPROFILE%\.yt-dlp\cookies.txt`
-- Linux/macOS: `~/.yt-dlp/cookies.txt`
+- **Windows:** `%USERPROFILE%\.yt-dlp\cookies.txt`
+  - 具体路径通常是：`C:\Users\[用户名]\.yt-dlp\cookies.txt`
+  
+- **Linux/macOS:** `~/.yt-dlp/cookies.txt`
 
-或者，您可以自定义路径，在 [config.py](file://d:\Python\Doc\qqbot\src\plugins\bilibili_downloader\config.py) 中修改 `GLOBAL_SETTINGS['cookie_file_path']` 的值。
+**在Windows上创建路径的步骤：**
+1. 按 Win+R 键打开"运行"对话框
+2. 输入 `%USERPROFILE%` 并回车
+3. 在打开的文件夹中创建名为 `.yt-dlp` 的文件夹
+4. 将 cookies.txt 文件放入此文件夹
 
-### 3. 特定平台登录提示
+**在Linux/macOS上创建路径的步骤：**
+```bash
+mkdir -p ~/.yt-dlp
+cp [cookies文件路径] ~/.yt-dlp/cookies.txt
+```
 
+### 特定平台登录提示
+
+- **Bilibili**: 需要登录大会员账号才能下载会员专享视频
 - **抖音**: 需要登录账号才能下载大部分视频，建议使用手机APP扫码登录获取有效cookies
 - **小红书**: 需要登录账号，部分视频需要登录后才能访问
 - **微博**: 某些视频需要登录才能下载
 - **YouTube**: 一般情况下不需要登录，但某些受限视频可能需要
-- **Bilibili**: 某些大会员专享视频需要登录才能下载
+
+### 注意事项
+
+- Cookies有有效期，可能需要定期更新
+- 对于某些平台，需要保持登录状态才能获取有效的cookies
+- 请妥善保管您的cookies文件，其中包含敏感的登录信息
+- 某些平台可能需要特定的headers或token，这时cookies文件特别重要
 
 ## 配置说明
 
