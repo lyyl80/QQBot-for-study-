@@ -1,5 +1,5 @@
 from nonebot import on_message
-from nonebot.adapters.onebot.v11 import Bot, Event, MessageEvent, GroupMessageEvent, PrivateMessageEvent
+from nonebot.adapters.onebot.v11 import Bot, Event, MessageEvent, GroupMessageEvent, PrivateMessageEvent, NoticeEvent
 from nonebot.params import EventPlainText
 import os
 from openai import OpenAI
@@ -822,8 +822,32 @@ long_term_memory = LongTermMemory()
 reminder_manager = ReminderManager()
 
 # 测试调度器启动（仅当环境变量 TEST_SCHEDULER=1 时启用）
-from nonebot import get_driver
+from nonebot import get_driver, on_notice, get_bot
 driver = get_driver()
+
+# 监听输入状态通知，尝试为用户设置命令提示
+input_status_notice = on_notice()
+@input_status_notice.handle()
+async def handle_input_status(event: NoticeEvent):
+    if event.notice_type == "input_status":
+        print(f"[DEBUG] 收到输入状态通知: {event}")
+        # 尝试调用 set_group_input_status 或 set_private_input_status
+        bot = get_bot()
+        try:
+            params = {
+                "input_status": {
+                    "type": "text",  # guess
+                    "placeholder": "可用命令：/reminder /help /prompt /summary"
+                }
+            }
+            if hasattr(event, "group_id"):
+                params["group_id"] = event.group_id
+                await bot.call_api("set_group_input_status", **params)
+            elif hasattr(event, "user_id"):
+                params["user_id"] = event.user_id
+                await bot.call_api("set_private_input_status", **params)
+        except Exception as e:
+            print(f"[DEBUG] 设置输入状态提示失败: {e}")
 
 @driver.on_startup
 async def test_scheduler():
@@ -1319,9 +1343,34 @@ Prompt长度：{prompt_len} 字符
     else:
         await mars_ai.send(f"未知命令：{command}")
 
+
+# 可用命令列表（可根据需要扩展）
+COMMAND_LIST_TEXT = (
+    "可用命令：\n"
+    "/clear - 清除当前对话历史\n"
+    "/prompt <内容|数字|list> - 设置或查看prompt\n"
+    "/summary - 总结当前对话内容\n"
+    "/reminder list - 列出提醒\n"
+    "/reminder cancel <id> - 取消提醒\n"
+    "/reminder clear - 清除所有待处理提醒\n"
+    "/reminder help - 查看提醒相关帮助\n"
+    "更多普通聊天直接发送内容即可与AI对话。"
+)
+
 @mars_ai.handle()
 async def handle_message(event: MessageEvent, msg: str = EventPlainText()):
     print(f"DEBUG: 消息处理器收到消息，用户: {event.user_id}, 消息: {msg}")
+    # 快速在@机器人时展示命令列表
+    try:
+        from nonebot.adapters.onebot.v11 import GroupMessageEvent
+        if isinstance(event, GroupMessageEvent) and event.to_me:
+            txt = msg.strip().replace(f"@{event.sender.nickname}", "").strip()
+            # 当用户仅@我或附带问号、命令关键词时
+            if txt == "" or txt in ["?", "？"] or any(k in txt for k in ["命令", "帮助", "help"]):
+                await mars_ai.send(COMMAND_LIST_TEXT)
+                return
+    except Exception:
+        pass
     # 检查是否是命令（以/开头）
     msg_stripped = msg.strip()
     if msg_stripped.startswith('/'):
