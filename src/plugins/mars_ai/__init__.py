@@ -444,28 +444,115 @@ class ReminderManager:
                 print(f"[DEBUG] 使用原文模式发送内容")
             
             print(f"[DEBUG] 最终消息内容: {message}, 用户ID: {user_id}, 渠道: {channel}")
-            
-            if channel == "private":
-                print(f"[DEBUG] 发送私聊消息给用户 {user_id}")
-                await bot.send_private_msg(user_id=user_id, message=message)
-            elif channel == "group":
-                group_id = reminder.get("group_id")
-                if group_id:
-                    print(f"[DEBUG] 发送群聊消息到群 {group_id}")
-                    await bot.send_group_msg(group_id=group_id, message=message)
-                else:
-                    # 如果没有group_id，尝试私聊
-                    print(f"[DEBUG] 没有group_id，发送私聊消息给用户 {user_id}")
-                    await bot.send_private_msg(user_id=user_id, message=message)
-            else:  # current 或默认
-                # 根据原始消息渠道决定
-                group_id = reminder.get("group_id")
-                if group_id:
-                    print(f"[DEBUG] 发送群聊消息到群 {group_id} (current渠道)")
-                    await bot.send_group_msg(group_id=group_id, message=message)
-                else:
-                    print(f"[DEBUG] 发送私聊消息给用户 {user_id} (current渠道)")
-                    await bot.send_private_msg(user_id=user_id, message=message)
+
+            # 发送前在群消息中处理@提及：支持@QQ号（如 @12345678）和@“昵称”/@"昵称"/@昵称（尝试匹配群成员昵称或群名片）
+            final_message = message
+            try:
+                if channel == "group":
+                    group_id = reminder.get("group_id")
+                    if group_id:
+                        import re
+                        # 如果已经包含CQ码则直接发送
+                        if "[CQ:" not in final_message:
+                            # 先替换纯数字形式的@QQ
+                            def _repl_num(m):
+                                return f"[CQ:at,qq={m.group(1)}]"
+                            final_message = re.sub(r"@(\d{5,})", _repl_num, final_message)
+
+                            # 处理 @“昵称” 或 @"昵称" 或 @昵称 的情况，尝试在群成员中查找匹配
+                            name_pattern = re.compile(r'@“([^”]+)”|@"([^\"]+)"|@([^\s@：:，,]+)')
+                            # 获取群成员列表（可能失败，需捕获异常）
+                            members = []
+                            try:
+                                members = await bot.get_group_member_list(group_id=group_id)
+                            except Exception as e:
+                                print(f"[DEBUG] 获取群成员列表失败: {e}")
+
+                            def find_member_id_by_name(name):
+                                if not members:
+                                    return None
+                                for m in members:
+                                    # 字段名可能为 'card' 或 'card_name'，试几个常见键
+                                    card = m.get('card') or m.get('card_name') or ''
+                                    nick = m.get('nickname') or m.get('nick') or ''
+                                    uid = str(m.get('user_id') or m.get('userId') or '')
+                                    if name == card or name == nick or name == uid:
+                                        return uid
+                                # 尝试包含匹配
+                                for m in members:
+                                    card = m.get('card') or m.get('card_name') or ''
+                                    nick = m.get('nickname') or m.get('nick') or ''
+                                    uid = str(m.get('user_id') or m.get('userId') or '')
+                                    if name in card or name in nick:
+                                        return uid
+                                return None
+
+                            # 使用迭代替换，避免重复替换影响索引
+                            for match in list(name_pattern.finditer(final_message)):
+                                groups = match.groups()
+                                name = next((g for g in groups if g), None)
+                                if not name:
+                                    continue
+                                member_id = find_member_id_by_name(name)
+                                if member_id:
+                                    final_message = final_message.replace(match.group(0), f"[CQ:at,qq={member_id}]")
+
+                        # 发送群消息
+                        print(f"[DEBUG] 发送群聊消息到群 {group_id}")
+                        await bot.send_group_msg(group_id=group_id, message=final_message)
+                    else:
+                        # 如果没有group_id，尝试私聊
+                        print(f"[DEBUG] 没有group_id，发送私聊消息给用户 {user_id}")
+                        await bot.send_private_msg(user_id=user_id, message=final_message)
+                elif channel == "private":
+                    print(f"[DEBUG] 发送私聊消息给用户 {user_id}")
+                    await bot.send_private_msg(user_id=user_id, message=final_message)
+                else:  # current 或默认
+                    group_id = reminder.get("group_id")
+                    if group_id:
+                        # 同样对current渠道的群消息做@处理
+                        import re
+                        if "[CQ:" not in final_message:
+                            def _repl_num2(m):
+                                return f"[CQ:at,qq={m.group(1)}]"
+                            final_message = re.sub(r"@(\d{5,})", _repl_num2, final_message)
+                            name_pattern = re.compile(r'@“([^”]+)”|@"([^\"]+)"|@([^\s@：:，,]+)')
+                            members = []
+                            try:
+                                members = await bot.get_group_member_list(group_id=group_id)
+                            except Exception as e:
+                                print(f"[DEBUG] 获取群成员列表失败: {e}")
+                            def find_member_id_by_name2(name):
+                                if not members:
+                                    return None
+                                for m in members:
+                                    card = m.get('card') or m.get('card_name') or ''
+                                    nick = m.get('nickname') or m.get('nick') or ''
+                                    uid = str(m.get('user_id') or m.get('userId') or '')
+                                    if name == card or name == nick or name == uid:
+                                        return uid
+                                for m in members:
+                                    card = m.get('card') or m.get('card_name') or ''
+                                    nick = m.get('nickname') or m.get('nick') or ''
+                                    uid = str(m.get('user_id') or m.get('userId') or '')
+                                    if name in card or name in nick:
+                                        return uid
+                                return None
+                            for match in list(name_pattern.finditer(final_message)):
+                                groups = match.groups()
+                                name = next((g for g in groups if g), None)
+                                if not name:
+                                    continue
+                                member_id = find_member_id_by_name2(name)
+                                if member_id:
+                                    final_message = final_message.replace(match.group(0), f"[CQ:at,qq={member_id}]")
+                        print(f"[DEBUG] 发送群聊消息到群 {group_id} (current渠道)")
+                        await bot.send_group_msg(group_id=group_id, message=final_message)
+                    else:
+                        print(f"[DEBUG] 发送私聊消息给用户 {user_id} (current渠道)")
+                        await bot.send_private_msg(user_id=user_id, message=final_message)
+            except Exception as e:
+                print(f"[ERROR] 发送消息时发生异常: {e}")
             
             # 更新状态
             reminder["status"] = "sent"
