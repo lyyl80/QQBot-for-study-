@@ -469,6 +469,14 @@ class ReminderManager:
                                 print(f"[DEBUG] 获取群成员列表失败: {e}")
 
                             def find_member_id_by_name(name):
+                                # 先尝试使用持久化映射
+                                gid_str = str(group_id)
+                                mapping = group_name_map.get(gid_str, {})
+                                if name in mapping:
+                                    return mapping[name]
+                                for k, v in mapping.items():
+                                    if name in k:
+                                        return v
                                 if not members:
                                     return None
                                 for m in members:
@@ -523,6 +531,13 @@ class ReminderManager:
                             except Exception as e:
                                 print(f"[DEBUG] 获取群成员列表失败: {e}")
                             def find_member_id_by_name2(name):
+                                gid_str = str(group_id)
+                                mapping = group_name_map.get(gid_str, {})
+                                if name in mapping:
+                                    return mapping[name]
+                                for k, v in mapping.items():
+                                    if name in k:
+                                        return v
                                 if not members:
                                     return None
                                 for m in members:
@@ -863,6 +878,9 @@ private_sessions = {}
 group_sessions = {}
 # 记录用户最近一次在群聊中使用机器人的群ID，用于私聊设置群提醒
 last_group_by_user = {}
+# 群昵称->QQ 映射，结构: {"group_id": {"昵称": "qq"}}
+group_name_map = {}
+group_name_map_file = Path("session/group_name_map.json")
 session_file = Path("session/user_sessions.json")
 session_cache = {"private": {}, "group": {}}
 
@@ -897,6 +915,37 @@ def save_sessions():
             json.dump(session_cache, f, ensure_ascii=False, indent=2)
     except Exception as e:
         print(f"保存会话失败: {e}")
+
+
+def load_group_name_map():
+    """加载群昵称到QQ的映射"""
+    global group_name_map
+    try:
+        if group_name_map_file.exists():
+            with open(group_name_map_file, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    group_name_map = loaded
+                else:
+                    group_name_map = {}
+        else:
+            group_name_map = {}
+    except Exception as e:
+        print(f"加载群昵称映射失败: {e}")
+        group_name_map = {}
+
+
+def save_group_name_map():
+    """保存群昵称到QQ的映射"""
+    try:
+        Path("session").mkdir(exist_ok=True)
+        with open(group_name_map_file, "w", encoding="utf-8") as f:
+            json.dump(group_name_map, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"保存群昵称映射失败: {e}")
+
+# 载入映射缓存
+load_group_name_map()
 
 from nonebot.rule import Rule
 from nonebot.typing import T_State
@@ -1301,6 +1350,29 @@ async def handle_message(event: MessageEvent, msg: str = EventPlainText()):
         group_id = event.group_id
         # 更新用户最后活跃群
         last_group_by_user[user_id] = event.group_id
+        # 记录群内昵称/名片到QQ的映射，便于后续@匹配
+        try:
+            sender = getattr(event, "sender", None)
+            name = None
+            if sender:
+                # 支持object属性或字典访问
+                try:
+                    name = getattr(sender, "card", None) or getattr(sender, "nickname", None)
+                except Exception:
+                    try:
+                        name = sender.get("card") or sender.get("nickname")
+                    except Exception:
+                        name = None
+            if name:
+                gid = str(event.group_id)
+                group_name_map.setdefault(gid, {})[name] = str(event.user_id)
+                # 异步/尽量快速保存映射
+                try:
+                    save_group_name_map()
+                except Exception as e:
+                    print(f"[DEBUG] 保存群昵称映射失败: {e}")
+        except Exception as e:
+            print(f"[DEBUG] 更新群昵称映射时出错: {e}")
     else:
         return
     
